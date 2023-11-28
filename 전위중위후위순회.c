@@ -1,7 +1,7 @@
 #include <stdio.h>
 #define DataType char
 
-typedef struct Tnode {
+typedef struct Tnode { //ë…¸ë“œ ìƒì„±
     struct Tnode *left;
     DataType data;
     struct Tnode *right;
@@ -45,9 +45,9 @@ int main() {
     Tnode node3 = {&node6, '/', &node7};
     Tnode node2 = {&node4, '*', &node5};
     Tnode node1 = {&node2, '+', &node3};
-    preoder(&node1); printf("<-ÀüÀ§ ¼øÈ¸\n");
-    inorder(&node1); printf("<-ÁßÀ§ ¼øÈ¸\n");
-    postorder(&node1); printf("<-ÈÄÀ§ ¼øÈ¸\n");
+    preoder(&node1); printf("<-ì „ìœ„ ìˆœíšŒ\n");
+    inorder(&node1); printf("<-ì¤‘ìœ„ ìˆœíšŒ\n");
+    postorder(&node1); printf("<-í›„ìœ„ ìˆœíšŒ\n");
 
 
 }
