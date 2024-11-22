@@ -1,0 +1,76 @@
+#define USE_ARDUINO_INTERRUPTS true  // 가장 정확한 BPM 계산을 위해 저수준 인터럽트 설정
+
+#include "src/PulseSensorPlayground.h" // PulseSensorPlayground 라이브러리 포함
+#include "src/TM74HC595Display.h"
+
+#define LOOP_TIME 10
+uint32_t currentTime = 0;
+uint16_t previousTime = 0;
+uint16_t cycleTime = 0;
+
+int myBPM = 0;    // 심박수 데이터
+int Signal = 0;     // 들어오는 원시 데이터. Signal 값은 0-1024 범위.
+int Threshold = 525;  // "박동"으로 간주할 Signal 값과 무시할 Signal 값을 구분하는 임계값.
+int countBuzzer = 0;  // 부저 출력을 위한 변수
+
+// 핀 설정
+int PulseSensorPurplePin = 0;   // 센서 입력 = A0번
+int pin_Buzzer = 8;             // 부저 출력 = 8번
+int SCLK =  4;   // FND SCLK핀 = 4번
+int RCLK = 3;   // FND RCLK핀 = 3번
+int DIO = 2;    // FND DIO핀 = 2번
+
+PulseSensorPlayground pulseSensor;    // 심박수 측정 센서 객체 생성
+TM74HC595Display disp(SCLK, RCLK, DIO); // FND 모듈 객체 생성
+
+// 설정 함수:
+void setup() {
+  Serial.begin(115200);
+  
+  pinMode(LED_BUILTIN, OUTPUT);   // 내장 LED 출력 설정
+  pinMode(pin_Buzzer, OUTPUT);    // 부저 출력 설정
+  pinMode(SCLK, OUTPUT);          // FND SCLK 출력 설정
+  pinMode(RCLK, OUTPUT);          // FND RCLK 출력 설정
+  pinMode(DIO, OUTPUT);           // FND DIO 출력 설정
+  digitalWrite(pin_Buzzer, LOW);  // 부저 초기 상태: 꺼짐
+  
+  pulseSensor.analogInput(PulseSensorPurplePin);  // PulseSensor에서 신호를 읽을 핀 설정
+  pulseSensor.blinkOnPulse(LED_BUILTIN);          // 박동이 감지되면 내장 LED 깜빡이기
+  pulseSensor.setThreshold(Threshold);   // 박동을 감지할 임계값 설정
+  pulseSensor.begin();                   // PulseSensor 초기화
+
+
+  // 시간값 초기화
+  previousTime = millis();
+  currentTime = millis();
+}
+
+// 메인 루프 함수
+void loop() {
+  Signal = analogRead(PulseSensorPurplePin);  //PulseSensor의 값을 읽음
+  Serial.println(Signal);  // Signal 값을 시리얼 모니터로 출력
+  myBPM = pulseSensor.getBeatsPerMinute();   // pulseSensor 객체에서 BPM 값을 가져옴
+  // "myBPM" 변수에 BPM 값 저장됨
+
+  if (pulseSensor.sawStartOfBeat()) { // "박동이 시작되었는지" 계속 체크
+    digitalWrite(pin_Buzzer, HIGH);        // 부저 켬
+    countBuzzer = 2; // 루프 함수가 2번 도는 동안 부저가 켜짐
+  }
+
+  // countBuzzer가 0이 될 때까지 -1 / 0이 되면 부저 꺼짐
+  if (countBuzzer == 0) { 
+    digitalWrite(pin_Buzzer, LOW);  // 부저 끔
+  }
+  else countBuzzer--;  // countBuzzer 값 감소
+
+  // LOOP_TIME(ms) 동안 대기 후, myBPM 값을 FND에 표시
+  while (1) {
+    currentTime = millis();
+    cycleTime = currentTime - previousTime;
+    disp.digit4(myBPM);  // FND에 BPM 값 표시
+    if (cycleTime >= LOOP_TIME) {
+      previousTime = currentTime; // 시간 변수 갱신
+      break;  // 루프 종료
+    }
+  }
+}
