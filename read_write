@@ -1,0 +1,84 @@
+#include <stdio.h>
+#include <pthread.h>
+#include <semaphore.h>
+
+#define MAX_READERS 5
+
+sem_t read_mutex;      // 읽기 작업의 동기화 세마포어
+sem_t write_mutex;     // 쓰기 작업의 동기화 세마포어
+int read_count = 0;    // 현재 읽고 있는 프로세스 수
+
+// 읽기 작업
+void *reader(void *arg) {
+    int reader_id = *((int*)arg);
+
+    // 읽기 시작
+    sem_wait(&read_mutex);  // 읽기 작업을 시작하기 전에 세마포어 획득
+    read_count++;
+    if (read_count == 1) {
+        sem_wait(&write_mutex); // 첫 번째 읽기 프로세스가 들어가면 쓰기 잠금 획득
+    }
+    sem_post(&read_mutex); // 세마포어 반환
+
+    // 데이터 읽기 (실제로는 읽을 데이터가 없으므로 단순히 출력)
+    printf("Reader %d is reading\n", reader_id);
+
+    // 읽기 작업 끝
+    sem_wait(&read_mutex);  // 읽기 작업을 종료할 때는 다시 세마포어 획득
+    read_count--;
+    if (read_count == 0) {
+        sem_post(&write_mutex); // 마지막 읽기 프로세스가 끝나면 쓰기 잠금을 해제
+    }
+    sem_post(&read_mutex); // 세마포어 반환
+
+    return NULL;
+}
+
+// 쓰기 작업
+void *writer(void *arg) {
+    int writer_id = *((int*)arg);
+
+    // 쓰기 시작
+    sem_wait(&write_mutex);  // 쓰기 작업을 시작하려면 쓰기 잠금을 획득
+
+    // 데이터 쓰기 (실제로는 단순히 출력)
+    printf("Writer %d is writing\n", writer_id);
+
+    // 쓰기 작업 끝
+    sem_post(&write_mutex);  // 쓰기 작업이 끝나면 잠금 해제
+
+    return NULL;
+}
+
+int main() {
+    pthread_t readers[MAX_READERS], writers[MAX_READERS];
+    int reader_ids[MAX_READERS], writer_ids[MAX_READERS];
+
+    // 세마포어 초기화
+    sem_init(&read_mutex, 0, 1);   // 읽기 세마포어 (mutex)
+    sem_init(&write_mutex, 0, 1);  // 쓰기 세마포어 (mutex)
+
+    // 독자 스레드 생성
+    for (int i = 0; i < MAX_READERS; i++) {
+        reader_ids[i] = i + 1; // 독자 ID 설정
+        pthread_create(&readers[i], NULL, reader, (void*)&reader_ids[i]);
+    }
+
+    // 작가 스레드 생성
+    for (int i = 0; i < MAX_READERS; i++) {
+        writer_ids[i] = i + 1; // 작가 ID 설정
+        pthread_create(&writers[i], NULL, writer, (void*)&writer_ids[i]);
+    }
+
+    // 스레드가 끝날 때까지 대기
+    for (int i = 0; i < MAX_READERS; i++) {
+        pthread_join(readers[i], NULL);
+        pthread_join(writers[i], NULL);
+    }
+
+    // 세마포어 파괴
+    sem_destroy(&read_mutex);
+    sem_destroy(&write_mutex);
+
+    return 0;
+}
