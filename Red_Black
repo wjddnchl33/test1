@@ -1,0 +1,170 @@
+#include <stdio.h>
+#include <stdlib.h>
+
+#define RED   0
+#define BLACK 1
+
+// 레드-블랙 트리 노드 구조체
+typedef struct Node {
+    int data;
+    int color; // RED(0) 또는 BLACK(1)
+    struct Node *left, *right, *parent;
+} Node;
+
+// 루트 노드
+Node *root = NULL;
+
+// 새 노드 생성
+Node* createNode(int data) {
+    Node* newNode = (Node*)malloc(sizeof(Node));
+    newNode->data = data;
+    newNode->color = RED; // 새 노드는 항상 RED로 시작
+    newNode->left = newNode->right = newNode->parent = NULL;
+    return newNode;
+}
+
+// 우측 회전
+void rightRotate(Node **root, Node *x) {
+    Node *y = x->left;
+    x->left = y->right;
+    if (y->right != NULL) {
+        y->right->parent = x;
+    }
+    y->parent = x->parent;
+    if (x->parent == NULL) {
+        *root = y;
+    } else if (x == x->parent->right) {
+        x->parent->right = y;
+    } else {
+        x->parent->left = y;
+    }
+    y->right = x;
+    x->parent = y;
+}
+
+// 좌측 회전
+void leftRotate(Node **root, Node *x) {
+    Node *y = x->right;
+    x->right = y->left;
+    if (y->left != NULL) {
+        y->left->parent = x;
+    }
+    y->parent = x->parent;
+    if (x->parent == NULL) {
+        *root = y;
+    } else if (x == x->parent->left) {
+        x->parent->left = y;
+    } else {
+        x->parent->right = y;
+    }
+    y->left = x;
+    x->parent = y;
+}
+
+// 삽입 후 트리 균형 맞추기
+void fixViolation(Node **root, Node *x) {
+    Node *uncle;
+    
+    while (x != root && x->parent->color == RED) {
+        // 부모가 왼쪽 자식일 때
+        if (x->parent == x->parent->parent->left) {
+            uncle = x->parent->parent->right;
+            
+            // Case 1: 삼촌이 RED인 경우
+            if (uncle != NULL && uncle->color == RED) {
+                x->parent->color = BLACK;
+                uncle->color = BLACK;
+                x->parent->parent->color = RED;
+                x = x->parent->parent;
+            } else {
+                // Case 2: x가 오른쪽 자식인 경우
+                if (x == x->parent->right) {
+                    x = x->parent;
+                    leftRotate(root, x);
+                }
+                // Case 3: x가 왼쪽 자식인 경우
+                x->parent->color = BLACK;
+                x->parent->parent->color = RED;
+                rightRotate(root, x->parent->parent);
+            }
+        } else { // 부모가 오른쪽 자식일 때
+            uncle = x->parent->parent->left;
+            
+            // Case 1: 삼촌이 RED인 경우
+            if (uncle != NULL && uncle->color == RED) {
+                x->parent->color = BLACK;
+                uncle->color = BLACK;
+                x->parent->parent->color = RED;
+                x = x->parent->parent;
+            } else {
+                // Case 2: x가 왼쪽 자식인 경우
+                if (x == x->parent->left) {
+                    x = x->parent;
+                    rightRotate(root, x);
+                }
+                // Case 3: x가 오른쪽 자식인 경우
+                x->parent->color = BLACK;
+                x->parent->parent->color = RED;
+                leftRotate(root, x->parent->parent);
+            }
+        }
+    }
+    root->color = BLACK;
+}
+
+// 트리 삽입 함수
+void insert(Node **root, int data) {
+    Node *newNode = createNode(data);
+    if (*root == NULL) {
+        *root = newNode;
+    } else {
+        Node *temp = *root;
+        while (1) {
+            if (data < temp->data) {
+                if (temp->left == NULL) {
+                    temp->left = newNode;
+                    newNode->parent = temp;
+                    break;
+                }
+                temp = temp->left;
+            } else {
+                if (temp->right == NULL) {
+                    temp->right = newNode;
+                    newNode->parent = temp;
+                    break;
+                }
+                temp = temp->right;
+            }
+        }
+    }
+
+    fixViolation(root, newNode);
+}
+
+// 중위 순회
+void inorder(Node *root) {
+    if (root != NULL) {
+        inorder(root->left);
+        printf("%d ", root->data);
+        inorder(root->right);
+    }
+}
+
+// 트리 초기화 및 삽입 예시
+int main() {
+    root = NULL;
+
+    // 값 삽입
+    insert(&root, 10);
+    insert(&root, 20);
+    insert(&root, 30);
+    insert(&root, 15);
+    insert(&root, 25);
+
+    // 중위 순회 출력
+    printf("중위 순회 결과: ");
+    inorder(root);
+    printf("\n");
+
+    return 0;
+}
