@@ -1,0 +1,65 @@
+#include <stdio.h>
+#include <pthread.h>
+#include <stdbool.h>
+#include <unistd.h>
+
+#define NUM_THREADS 2  // 두 프로세스
+
+// flag 배열과 turn 변수 선언
+volatile bool flag[NUM_THREADS] = {false, false};
+volatile int turn;
+
+// 임계 영역 함수
+void critical_section(int thread_id) {
+    printf("Thread %d is in critical section\n", thread_id);
+    sleep(1);  // 임계 영역에서 작업을 수행하는 시간 (여기서는 sleep으로 대체)
+    printf("Thread %d has left critical section\n", thread_id);
+}
+
+// 피터슨의 알고리즘을 사용한 임계 영역 진입
+void peterson_algorithm(int thread_id) {
+    int other = (thread_id + 1) % NUM_THREADS;  // 다른 프로세스의 id
+
+    while (1) {
+        // 1. 자신이 임계 영역에 들어가려는 의도를 표시
+        flag[thread_id] = true;
+        
+        // 2. 다른 프로세스가 임계 영역에 들어가기를 원할 때 기다리도록 turn 설정
+        turn = other;
+
+        // 3. 만약 다른 프로세스가 임계 영역에 진입하려면 기다림
+        while (flag[other] && turn == other) {
+            // 다른 프로세스가 임계 영역에 들어갈 차례면 기다림
+        }
+
+        // 4. 이제 임계 영역에 안전하게 들어갈 수 있음
+        critical_section(thread_id);
+
+        // 5. 임계 영역을 떠날 때 flag를 false로 설정
+        flag[thread_id] = false;
+    }
+}
+
+// 스레드 함수
+void* thread_func(void* arg) {
+    int thread_id = *((int*)arg);
+    peterson_algorithm(thread_id);
+    return NULL;
+}
+
+int main() {
+    pthread_t threads[NUM_THREADS];
+    int thread_ids[NUM_THREADS] = {0, 1};
+
+    // 스레드 생성
+    for (int i = 0; i < NUM_THREADS; i++) {
+        pthread_create(&threads[i], NULL, thread_func, &thread_ids[i]);
+    }
+
+    // 스레드 종료 대기
+    for (int i = 0; i < NUM_THREADS; i++) {
+        pthread_join(threads[i], NULL);
+    }
+
+    return 0;
+}
