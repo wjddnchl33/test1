@@ -1,0 +1,96 @@
+#include <stdio.h>
+#include <pthread.h>
+#include <semaphore.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+#define NUM_PHILOSOPHERS 5
+
+// 철학자 상태 정의
+typedef enum { THINKING, HUNGRY, EATING } philosopher_state;
+philosopher_state state[NUM_PHILOSOPHERS];
+
+// 세마포어 정의
+sem_t mutex;
+sem_t forks[NUM_PHILOSOPHERS];  // 각 포크에 대한 세마포어
+
+// 철학자가 식사할 수 있는지 체크하는 함수
+void test(int i) {
+    int left = (i + NUM_PHILOSOPHERS - 1) % NUM_PHILOSOPHERS;  // 왼쪽 포크
+    int right = (i + 1) % NUM_PHILOSOPHERS;  // 오른쪽 포크
+
+    // 철학자가 생각 상태에서 배고프고, 양쪽 포크가 모두 사용 가능하면
+    if (state[i] == HUNGRY && state[left] != EATING && state[right] != EATING) {
+        state[i] = EATING;
+        printf("Philosopher %d is eating\n", i);
+        sem_post(&forks[i]);  // 자신이 먹을 수 있도록 세마포어 신호 보내기
+    }
+}
+
+// 철학자가 음식을 먹는 함수
+void* philosopher(void* num) {
+    int i = *(int*)num;
+
+    while (1) {
+        // 철학자는 생각하기
+        printf("Philosopher %d is thinking\n", i);
+        usleep(rand() % 1000);  // 생각하는데 걸리는 시간 (임의로 설정)
+
+        // 배고프면
+        state[i] = HUNGRY;
+        printf("Philosopher %d is hungry\n", i);
+        sem_wait(&mutex);  // 크리티컬 섹션 진입
+        test(i);  // 철학자가 음식을 먹을 수 있는지 확인
+        sem_post(&mutex);  // 크리티컬 섹션 종료
+
+        // 음식을 먹기
+        sem_wait(&forks[i]);  // 자신이 먹을 수 있으면 포크를 잡음
+
+        // 식사 후
+        usleep(rand() % 1000);  // 먹는데 걸리는 시간 (임의로 설정)
+        printf("Philosopher %d has finished eating\n", i);
+
+        // 먹고 난 후 다시 생각 상태로
+        state[i] = THINKING;
+
+        // 왼쪽과 오른쪽 철학자가 식사를 할 수 있는지 테스트
+        int left = (i + NUM_PHILOSOPHERS - 1) % NUM_PHILOSOPHERS;
+        int right = (i + 1) % NUM_PHILOSOPHERS;
+        sem_wait(&mutex);
+        test(left);
+        test(right);
+        sem_post(&mutex);
+    }
+
+    return NULL;
+}
+
+int main() {
+    pthread_t philosophers[NUM_PHILOSOPHERS];
+    int philosopher_ids[NUM_PHILOSOPHERS];
+
+    // 세마포어 초기화
+    sem_init(&mutex, 0, 1);  // 크리티컬 섹션에 대한 뮤텍스 초기화
+    for (int i = 0; i < NUM_PHILOSOPHERS; i++) {
+        sem_init(&forks[i], 0, 0);  // 포크 세마포어 초기화
+    }
+
+    // 철학자 스레드 생성
+    for (int i = 0; i < NUM_PHILOSOPHERS; i++) {
+        philosopher_ids[i] = i;
+        pthread_create(&philosophers[i], NULL, philosopher, (void*)&philosopher_ids[i]);
+    }
+
+    // 모든 스레드가 종료될 때까지 대기
+    for (int i = 0; i < NUM_PHILOSOPHERS; i++) {
+        pthread_join(philosophers[i], NULL);
+    }
+
+    // 세마포어 종료
+    for (int i = 0; i < NUM_PHILOSOPHERS; i++) {
+        sem_destroy(&forks[i]);
+    }
+    sem_destroy(&mutex);
+
+    return 0;
+}
